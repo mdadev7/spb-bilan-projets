@@ -71,6 +71,9 @@
                     <button type="button" class="btn btn-success btn-sm" id="exportWordBtn" onclick="exportWordReport()" disabled>
                         <i class="bi bi-file-earmark-word me-1"></i> Générer Word (.docx)
                     </button>
+                    <button type="button" class="btn btn-danger btn-sm" id="exportPdfBtn" onclick="exportPdfReport()" disabled>
+                        <i class="bi bi-file-earmark-pdf me-1"></i> Générer PDF
+                    </button>
                 </div>
             </div>
         </div>
@@ -238,45 +241,59 @@
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-<script>
+<script th:inline="javascript">
     // Variables globales
     let selectedProjectIds = [];
     let previewProjectIds = [];
 
+    // Helper pour logger en sécurité
+    function safeLog(...args) {
+        if (typeof console !== 'undefined' && console.log) {
+            console.log('[Synthese]', ...args);
+        }
+    }
+
     // Initialisation au chargement
     document.addEventListener('DOMContentLoaded', function() {
+        safeLog('DOMContentLoaded - initialisation');
         updateSelection();
         updateHeaderCheckbox();
     });
 
     // Met à jour la sélection et l'état des boutons
     function updateSelection() {
+        safeLog('updateSelection called');
         const checkboxes = document.querySelectorAll('.project-checkbox:checked');
         selectedProjectIds = Array.from(checkboxes).map(cb => parseInt(cb.value));
+        safeLog('Selected:', selectedProjectIds);
         
         const count = selectedProjectIds.length;
         const total = document.querySelectorAll('.project-checkbox').length;
+        safeLog('Count:', count, 'Total:', total);
         
-        document.getElementById('selectedCount').textContent = count;
+        const selectedCountEl = document.getElementById('selectedCount');
+        if (selectedCountEl) {
+            selectedCountEl.textContent = count;
+        } else {
+            safeLog('WARNING: selectedCount element not found');
+        }
         
         const previewBtn = document.getElementById('previewBtn');
         const exportBtn = document.getElementById('exportWordBtn');
+        const exportPdfBtn = document.getElementById('exportPdfBtn');
         
-        if (count > 0) {
-            previewBtn.disabled = false;
-            exportBtn.disabled = false;
-        } else {
-            previewBtn.disabled = true;
-            exportBtn.disabled = true;
-        }
+        if (previewBtn) previewBtn.disabled = count === 0;
+        if (exportBtn) exportBtn.disabled = count === 0;
         
         // Mise à jour visuelle des lignes
         document.querySelectorAll('.project-row').forEach(row => {
             const cb = row.querySelector('.project-checkbox');
-            if (cb.checked) {
-                row.classList.add('selected');
-            } else {
-                row.classList.remove('selected');
+            if (cb) {
+                if (cb.checked) {
+                    row.classList.add('selected');
+                } else {
+                    row.classList.remove('selected');
+                }
             }
         });
         
@@ -285,7 +302,10 @@
 
     // Coche/décoche tous les projets
     function selectAllProjects(select) {
-        document.querySelectorAll('.project-checkbox').forEach(cb => {
+        safeLog('selectAllProjects:', select);
+        const checkboxes = document.querySelectorAll('.project-checkbox');
+        safeLog('Found checkboxes:', checkboxes.length);
+        checkboxes.forEach(cb => {
             cb.checked = select;
         });
         updateSelection();
@@ -293,8 +313,10 @@
 
     // Gère la checkbox "Tout sélectionner" dans l'en-tête
     function toggleAllCheckboxes(headerCheckbox) {
-        document.querySelectorAll('.project-checkbox').forEach(cb => {
-            cb.checked = headerCheckbox.checked;
+        safeLog('toggleAllCheckboxes:', headerCheckbox?.checked);
+        const checkboxes = document.querySelectorAll('.project-checkbox');
+        checkboxes.forEach(cb => {
+            cb.checked = headerCheckbox?.checked;
         });
         updateSelection();
     }
@@ -302,6 +324,10 @@
     // Met à jour l'état de la checkbox d'en-tête
     function updateHeaderCheckbox() {
         const headerCb = document.getElementById('selectAllHeader');
+        if (!headerCb) {
+            safeLog('WARNING: selectAllHeader element not found');
+            return;
+        }
         const allCheckboxes = document.querySelectorAll('.project-checkbox');
         const checkedCheckboxes = document.querySelectorAll('.project-checkbox:checked');
         
@@ -319,6 +345,7 @@
 
     // Ouvre la modale d'aperçu
     function openPreviewModal() {
+        safeLog('openPreviewModal called');
         previewProjectIds = [...selectedProjectIds];
         
         if (previewProjectIds.length === 0) {
@@ -327,7 +354,20 @@
         }
         
         // Affiche la modale
-        const modal = new bootstrap.Modal(document.getElementById('previewModal'));
+        const modalEl = document.getElementById('previewModal');
+        if (!modalEl) {
+            safeLog('ERROR: previewModal element not found');
+            alert('Erreur: modal non trouvé');
+            return;
+        }
+        
+        if (typeof bootstrap === 'undefined' || !bootstrap.Modal) {
+            safeLog('ERROR: bootstrap.Modal not available');
+            alert('Erreur: Bootstrap JS non chargé');
+            return;
+        }
+        
+        const modal = new bootstrap.Modal(modalEl);
         modal.show();
         
         // Charge le contenu de l'aperçu via AJAX
@@ -336,10 +376,18 @@
 
     // Charge le contenu HTML de l'aperçu
     function loadPreviewContent() {
+        safeLog('loadPreviewContent called');
         const container = document.getElementById('previewContent');
+        if (!container) {
+            safeLog('ERROR: previewContent element not found');
+            return;
+        }
         container.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Chargement...</span></div><p class="mt-2 text-muted">Génération de l\'aperçu...</p></div>';
         
-        fetch('/api/synthese/annee/' + ${anneeSelect} + '/preview', {
+        const url = '/api/synthese/annee/' + [[${anneeSelect}]] + '/preview';
+        safeLog('Fetching:', url);
+        
+        fetch(url, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -348,14 +396,15 @@
             body: JSON.stringify({ projetIds: previewProjectIds })
         })
         .then(response => {
-            if (!response.ok) throw new Error('Erreur lors du chargement de l\'aperçu');
+            safeLog('Response status:', response.status);
+            if (!response.ok) throw new Error('Erreur lors du chargement de l\'aperçu: ' + response.status);
             return response.text();
         })
         .then(html => {
             container.innerHTML = html;
         })
         .catch(error => {
-            console.error(error);
+            safeLog('ERROR:', error);
             container.innerHTML = '<div class="alert alert-danger m-3">Erreur lors du chargement de l\'aperçu : ' + error.message + '</div>';
         });
     }
@@ -384,21 +433,87 @@
             return;
         }
         
-        // Crée un formulaire invisible pour le POST et téléchargement
-        const form = document.createElement('form');
-        form.method = 'POST';
-        form.action = '/api/synthese/annee/' + ${anneeSelect} + '/export-word';
-        form.style.display = 'none';
+        safeLog('exportWordReport called with:', ids);
         
-        const input = document.createElement('input');
-        input.type = 'hidden';
-        input.name = 'projetIds';
-        input.value = JSON.stringify(ids);
-        form.appendChild(input);
+        const url = '/api/synthese/annee/' + [[${anneeSelect}]] + '/export-word';
         
-        document.body.appendChild(form);
-        form.submit();
-        document.body.removeChild(form);
+        fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: JSON.stringify({ projetIds: ids })
+        })
+        .then(response => {
+            safeLog('Export response status:', response.status);
+            if (!response.ok) {
+                return response.text().then(text => { throw new Error(text); });
+            }
+            return response.blob();
+        })
+        .then(blob => {
+            // Créer un lien de téléchargement
+            const downloadUrl = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = downloadUrl;
+            link.setAttribute('download', 'Bilan_Annuel_Projets_' + [[${anneeSelect}]] + '.docx');
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            window.URL.revokeObjectURL(downloadUrl);
+            safeLog('Word export downloaded successfully');
+        })
+        .catch(error => {
+            safeLog('ERROR during Word export:', error);
+            alert('Erreur lors de la génération du Word : ' + error.message);
+        });
+    }
+
+    // Exporte le rapport PDF
+    function exportPdfReport() {
+        const ids = selectedProjectIds;
+        
+        if (ids.length === 0) {
+            alert('Veuillez sélectionner au moins un projet.');
+            return;
+        }
+        
+        safeLog('exportPdfReport called with:', ids);
+        
+        const url = '/api/synthese/annee/' + [[${anneeSelect}]] + '/export-pdf';
+        
+        fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: JSON.stringify({ projetIds: ids })
+        })
+        .then(response => {
+            safeLog('PDF Export response status:', response.status);
+            if (!response.ok) {
+                return response.text().then(text => { throw new Error(text); });
+            }
+            return response.blob();
+        })
+        .then(blob => {
+            // Créer un lien de téléchargement
+            const downloadUrl = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = downloadUrl;
+            link.setAttribute('download', 'Bilan_Annuel_Projets_' + [[${anneeSelect}]] + '.pdf');
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            window.URL.revokeObjectURL(downloadUrl);
+            safeLog('PDF export downloaded successfully');
+        })
+        .catch(error => {
+            safeLog('ERROR during PDF export:', error);
+            alert('Erreur lors de la génération du PDF : ' + error.message);
+        });
     }
 </script>
 </body>

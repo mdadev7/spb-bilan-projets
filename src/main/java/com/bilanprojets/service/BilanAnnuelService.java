@@ -25,5 +25,6 @@ public interface BilanAnnuelService {
     List<BilanAnnuelDTO> getProjetsEligiblesPourRapport(Integer annee);
     String genererApercuHtml(Integer annee, List<Long> projetIds);
     byte[] genererRapportWord(Integer annee, List<Long> projetIds, String titreDocument);
+    byte[] genererRapportPdf(Integer annee, List<Long> projetIds, String titreDocument);
     void mettreAJourSelectionRapport(Integer annee, List<Long> projetIdsInclus);
 }

@@ -100,4 +100,10 @@ public class SituationProjetFicheDTO {
     private List<FonctionnaliteDTO> listeFonctionnalites = new ArrayList<>();
 
     private LocalDateTime dateDerniereMiseAJour;
+
+    /**
+     * Indique si ce projet doit être inclus dans le rapport annuel consolidé.
+     * Géré par cases à cocher dans l'écran de synthèse annuelle.
+     */
+    private Boolean inclusRapportAnnuel;
 }

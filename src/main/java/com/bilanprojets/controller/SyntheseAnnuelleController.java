@@ -70,6 +70,27 @@ public class SyntheseAnnuelleController {
                 .body(document);
     }
 
+    @PostMapping("/annee/{annee}/export-pdf")
+    @Operation(summary = "Générer et télécharger le rapport PDF pour les projets sélectionnés")
+    public ResponseEntity<byte[]> exportPdf(
+            @PathVariable Integer annee,
+            @RequestBody Map<String, List<Long>> request) {
+        List<Long> projetIds = request.get("projetIds");
+        if (projetIds == null || projetIds.isEmpty()) {
+            return ResponseEntity.badRequest().build();
+        }
+        String titre = "Bilan Annuel des Projets " + annee;
+        byte[] document = bilanAnnuelService.genererRapportPdf(annee, projetIds, titre);
+        
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_PDF);
+        headers.setContentDispositionFormData("attachment", "Bilan_Annuel_Projets_" + annee + ".pdf");
+        
+        return ResponseEntity.ok()
+                .headers(headers)
+                .body(document);
+    }
+
     @PostMapping("/annee/{annee}/selection")
     @Operation(summary = "Mettre à jour la sélection des projets pour le rapport annuel")
     public ResponseEntity<Void> mettreAJourSelection(

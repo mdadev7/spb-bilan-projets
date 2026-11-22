@@ -14,6 +14,7 @@ import com.bilanprojets.repository.UtilisateurRepository;
 import com.bilanprojets.service.BilanAnnuelService;
 import lombok.RequiredArgsConstructor;
 import org.apache.poi.xwpf.usermodel.*;
+import org.xhtmlrenderer.pdf.ITextRenderer;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -424,6 +425,27 @@ public class BilanAnnuelServiceImpl implements BilanAnnuelService {
         }
     }
 
+    @Override
+    public byte[] genererRapportPdf(Integer annee, List<Long> projetIds, String titreDocument) {
+        try {
+            // Générer le HTML en réutilisant la méthode existante
+            String htmlContent = genererApercuHtml(annee, projetIds);
+
+            // Convertir HTML en PDF avec Flying Saucer + OpenPDF
+            ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+
+            // Configuration de Flying Saucer
+            ITextRenderer renderer = new ITextRenderer();
+            renderer.setDocumentFromString(htmlContent);
+            renderer.layout();
+            renderer.createPDF(outputStream);
+
+            return outputStream.toByteArray();
+        } catch (Exception e) {
+            throw new RuntimeException("Erreur lors de la génération du document PDF", e);
+        }
+    }
+
     private void addReportHeader(XWPFDocument document, String titre, Integer annee) {
         XWPFParagraph titlePara = document.createParagraph();
         titlePara.setAlignment(ParagraphAlignment.CENTER);
@@ -612,6 +634,7 @@ public class BilanAnnuelServiceImpl implements BilanAnnuelService {
         String fonctPrincipales = bilan != null ? bilan.getFonctionnalitesPrincipales() : "";
         String perspectives = bilan != null ? bilan.getPerspectivesAnneeSuivante() : "";
         String commentaires = bilan != null ? bilan.getCommentaires() : "";
+        Boolean inclusRapportAnnuel = bilan != null ? bilan.getInclusRapportAnnuel() : true;
 
         if ((fonctPrincipales == null || fonctPrincipales.isBlank()) && !fonctDTOs.isEmpty()) {
             List<String> princ = fonctDTOs.stream()
@@ -645,6 +668,7 @@ public class BilanAnnuelServiceImpl implements BilanAnnuelService {
                 .fonctionnalitesPrincipales(fonctPrincipales)
                 .perspectivesAnneeSuivante(perspectives)
                 .commentaires(commentaires)
+                .inclusRapportAnnuel(inclusRapportAnnuel)
                 .totalFonctionnalites(total)
                 .fonctionnalitesTerminees(terminees)
                 .fonctionnalitesEnCours(enCours)

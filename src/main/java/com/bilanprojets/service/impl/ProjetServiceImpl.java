@@ -70,13 +70,27 @@ public class ProjetServiceImpl implements ProjetService {
         Projet projet = projetRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Projet introuvable avec l'ID : " + id));
 
-        if (!projet.getCode().equalsIgnoreCase(dto.getCode()) && projetRepository.existsByCode(dto.getCode())) {
-            throw new BusinessException("Un projet avec le code '" + dto.getCode() + "' existe déjà.");
+        // Validate and update code
+        if (dto.getCode() != null && !dto.getCode().isBlank()) {
+            String newCode = dto.getCode().trim().toUpperCase();
+            if (!projet.getCode().equalsIgnoreCase(newCode) && projetRepository.existsByCode(newCode)) {
+                throw new BusinessException("Un projet avec le code '" + newCode + "' existe déjà.");
+            }
+            projet.setCode(newCode);
         }
 
-        projet.setCode(dto.getCode().trim().toUpperCase());
-        projet.setIntitule(dto.getIntitule().trim());
-        projet.setDescription(dto.getDescription());
+        // Validate and update intitule (required)
+        if (dto.getIntitule() != null && !dto.getIntitule().isBlank()) {
+            projet.setIntitule(dto.getIntitule().trim());
+        } else {
+            throw new BusinessException("L'intitulé du projet est obligatoire");
+        }
+
+        // Update description (can be blank/null)
+        if (dto.getDescription() != null) {
+            projet.setDescription(dto.getDescription().trim());
+        }
+
         if (dto.getTypeProjet() != null) {
             projet.setTypeProjet(dto.getTypeProjet());
         }

@@ -133,7 +133,8 @@ public class WebProjetController {
             redirect.addFlashAttribute("successMessage", "Le projet '" + saved.getIntitule() + "' a été créé et affecté avec succès !");
             return "redirect:/projets/" + saved.getId();
         } catch (Exception e) {
-            redirect.addFlashAttribute("errorMessage", "Erreur lors de la création : " + e.getMessage());
+            String rootMessage = ErrorUtils.getRootCauseMessage(e);
+            redirect.addFlashAttribute("errorMessage", "Erreur lors de la création : " + rootMessage);
             return "redirect:/projets/nouveau";
         }
     }
@@ -171,7 +172,8 @@ public class WebProjetController {
             projetService.affecterResponsable(id, responsableId);
             redirect.addFlashAttribute("successMessage", "Le responsable du projet a été mis à jour !");
         } catch (Exception e) {
-            redirect.addFlashAttribute("errorMessage", "Erreur : " + e.getMessage());
+            String rootMessage = ErrorUtils.getRootCauseMessage(e);
+            redirect.addFlashAttribute("errorMessage", "Erreur : " + rootMessage);
         }
         return "redirect:/projets/" + id;
     }
@@ -205,7 +207,8 @@ public class WebProjetController {
             bilanAnnuelService.enregistrerFicheComplete(fiche);
             redirect.addFlashAttribute("successMessage", "Le bilan pour l'année " + annee + " a été enregistré avec succès !");
         } catch (Exception e) {
-            redirect.addFlashAttribute("errorMessage", "Erreur : " + e.getMessage());
+            String rootMessage = ErrorUtils.getRootCauseMessage(e);
+            redirect.addFlashAttribute("errorMessage", "Erreur : " + rootMessage);
         }
         return "redirect:/projets/" + id + "?annee=" + annee;
     }
@@ -226,7 +229,8 @@ public class WebProjetController {
             fonctionnaliteService.ajouterFonctionnalite(id, dto);
             redirect.addFlashAttribute("successMessage", "Fonctionnalité ajoutée avec succès !");
         } catch (Exception e) {
-            redirect.addFlashAttribute("errorMessage", "Erreur lors de l'ajout : " + e.getMessage());
+            String rootMessage = ErrorUtils.getRootCauseMessage(e);
+            redirect.addFlashAttribute("errorMessage", "Erreur lors de l'ajout : " + rootMessage);
         }
         return "redirect:/projets/" + id;
     }
@@ -248,7 +252,8 @@ public class WebProjetController {
             fonctionnaliteService.changerStatut(fId, statut);
             redirect.addFlashAttribute("successMessage", "Statut de la fonctionnalité mis à jour !");
         } catch (Exception e) {
-            redirect.addFlashAttribute("errorMessage", "Erreur : " + e.getMessage());
+            String rootMessage = ErrorUtils.getRootCauseMessage(e);
+            redirect.addFlashAttribute("errorMessage", "Erreur : " + rootMessage);
         }
         return "redirect:/projets/" + id;
     }
@@ -269,7 +274,8 @@ public class WebProjetController {
             fonctionnaliteService.supprimerFonctionnalite(fId);
             redirect.addFlashAttribute("successMessage", "Fonctionnalité supprimée.");
         } catch (Exception e) {
-            redirect.addFlashAttribute("errorMessage", "Erreur : " + e.getMessage());
+            String rootMessage = ErrorUtils.getRootCauseMessage(e);
+            redirect.addFlashAttribute("errorMessage", "Erreur : " + rootMessage);
         }
         return "redirect:/projets/" + id;
     }
@@ -283,7 +289,8 @@ public class WebProjetController {
             redirect.addFlashAttribute("successMessage", "Projet supprimé.");
             return "redirect:/projets";
         } catch (Exception e) {
-            redirect.addFlashAttribute("errorMessage", "Erreur : " + e.getMessage());
+            String rootMessage = ErrorUtils.getRootCauseMessage(e);
+            redirect.addFlashAttribute("errorMessage", "Erreur : " + rootMessage);
             return "redirect:/projets/" + id;
         }
     }
