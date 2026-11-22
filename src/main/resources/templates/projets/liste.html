@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestion des Projets - Bilan Annuel</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <style>
+        .text-truncate-3 {
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+        .action-en-cours-badge {
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.6; }
+            100% { opacity: 1; }
+        }
+    </style>
+</head>
+<body class="bg-light">
+
+<div th:replace="~{layout/navbar :: navbar}"></div>
+
+<div class="container-fluid px-4 py-4">
+
+    <!-- En-tête -->
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 pb-2 border-bottom">
+        <div>
+            <h2 class="fw-bold mb-1">
+                <i class="bi bi-folder2-open text-primary me-2"></i>Portefeuille de Projets
+            </h2>
+            <p class="text-muted mb-0">Gestion des projets nouveaux, pluriannuels et anciens affectés aux responsables.</p>
+        </div>
+
+        <div class="d-flex gap-2 mt-2 mt-md-0" sec:authorize="hasAuthority('ROLE_ADMIN')">
+            <a th:href="@{/projets/nouveau}" class="btn btn-primary btn-sm shadow-sm">
+                <i class="bi bi-plus-circle me-1"></i> Nouveau Projet
+            </a>
+        </div>
+    </div>
+
+    <!-- Alertes -->
+    <div th:if="${successMessage}" class="alert alert-success alert-dismissible fade show" role="alert">
+        <i class="bi bi-check-circle-fill me-2"></i><span th:text="${successMessage}"></span>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    <div th:if="${errorMessage}" class="alert alert-danger alert-dismissible fade show" role="alert">
+        <i class="bi bi-exclamation-triangle-fill me-2"></i><span th:text="${errorMessage}"></span>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+
+    <!-- Filtres rapides -->
+    <div class="d-flex flex-wrap gap-2 mb-4">
+        <a th:href="@{/projets}" class="btn btn-sm" th:classappend="${filtreType == null and !(filtreMesProjets ?: false)} ? 'btn-dark' : 'btn-outline-dark'">
+            Tous les projets
+        </a>
+        <a th:href="@{/projets(mesProjets=true)}" sec:authorize="hasAuthority('ROLE_RESPONSABLE')" class="btn btn-sm" th:classappend="${filtreMesProjets} ? 'btn-primary' : 'btn-outline-primary'">
+            <i class="bi bi-person-check-fill me-1"></i> Mes projets assignés
+        </a>
+        <a th:href="@{/projets(type='NOUVEAU')}" class="btn btn-sm" th:classappend="${filtreType?.name() == 'NOUVEAU'} ? 'btn-success' : 'btn-outline-success'">
+            <i class="bi bi-sparkles me-1"></i> Nouveaux projets
+        </a>
+        <a th:href="@{/projets(type='PLURIANNUEL')}" class="btn btn-sm" th:classappend="${filtreType?.name() == 'PLURIANNUEL'} ? 'btn-primary' : 'btn-outline-primary'">
+            <i class="bi bi-arrow-repeat me-1"></i> Projets pluriannuels
+        </a>
+        <a th:href="@{/projets(type='ANCIEN')}" class="btn btn-sm" th:classappend="${filtreType?.name() == 'ANCIEN'} ? 'btn-secondary' : 'btn-outline-secondary'">
+            <i class="bi bi-archive me-1"></i> Anciens projets
+        </a>
+    </div>
+
+    <!-- Grille des Projets -->
+    <div class="row g-4">
+        <div class="col-md-6 col-xl-4" th:each="p : ${projets}">
+            <div class="card h-100 border-0 shadow-sm rounded-3" th:classappend="${p.actionEnCours} ? 'border-warning border-2' : ''">
+                <div class="card-body p-4 d-flex flex-column justify-content-between">
+                    <div>
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <span class="badge bg-light text-dark border font-monospace" th:text="${p.code}"></span>
+                            
+                            <div class="d-flex gap-1">
+                                <span th:if="${p.typeProjet?.name() == 'NOUVEAU'}" class="badge bg-success-subtle text-success border border-success">
+                                    <i class="bi bi-sparkles me-1"></i>Nouveau
+                                </span>
+                                <span th:if="${p.typeProjet?.name() == 'PLURIANNUEL'}" class="badge bg-primary-subtle text-primary border border-primary">
+                                    <i class="bi bi-arrow-repeat me-1"></i>Pluriannuel
+                                </span>
+                                <span th:if="${p.typeProjet?.name() == 'ANCIEN'}" class="badge bg-secondary-subtle text-secondary border border-secondary">
+                                    <i class="bi bi-archive me-1"></i>Ancien
+                                </span>
+                                
+                                <!-- Badge "Action en cours" - Phase 3 -->
+                                <span th:if="${p.actionEnCours}" class="badge bg-warning-subtle text-warning border border-warning action-en-cours-badge d-flex align-items-center" title="Projet avec action récente (moins de 7 jours)">
+                                    <i class="bi bi-bell-fill me-1"></i>Actif
+                                </span>
+                                <span th:if="${not p.actionEnCours and p.dateDerniereAction != null and p.aActionRecente()}" class="badge bg-success-subtle text-success border border-success action-en-cours-badge d-flex align-items-center" title="Projet mis à jour récemment (moins de 7 jours)">
+                                    <i class="bi bi-arrow-repeat me-1"></i>Récent
+                                </span>
+                            </div>
+                        </div>
+
+                        <h5 class="fw-bold mb-2">
+                            <a th:href="@{/projets/{id}(id=${p.id})}" class="text-dark text-decoration-none" th:text="${p.intitule}"></a>
+                        </h5>
+
+                        <p class="text-muted small mb-3 text-truncate-3" th:text="${p.description}"></p>
+
+                        <div class="bg-light p-2 rounded mb-3 small" th:if="${p.anneeDebut != null or p.anneeFinPrevue != null}">
+                            <i class="bi bi-calendar3 text-muted me-1"></i> Période :
+                            <strong th:text="${p.anneeDebut} ?: '?'"></strong> - <strong th:text="${p.anneeFinPrevue} ?: 'En cours'"></strong>
+                        </div>
+
+                        <!-- Structure organisationnelle - Phase 1 -->
+                        <div class="bg-light p-2 rounded mb-3 small" th:if="${p.structureLibelle != null}">
+                            <i class="bi bi-diagram-3 text-muted me-1"></i> Structure :
+                            <strong th:text="${p.structureLibelle}"></strong>
+                            <span th:if="${p.structureCode != null}" class="text-muted small">[<span th:text="${p.structureCode}"></span>]</span>
+                        </div>
+
+                        <!-- Créateur vs Responsable -->
+                        <div class="small text-muted mb-2" th:if="${p.createurNomComplet != null and p.responsableNomComplet != null and p.createurId != p.responsableId}">
+                            <i class="bi bi-person-plus text-info me-1"></i> Créé par : <strong th:text="${p.createurNomComplet}"></strong>
+                            <span class="ms-2"><i class="bi bi-person-badge text-primary me-1"></i> Affecté à : <strong th:text="${p.responsableNomComplet}"></strong></span>
+                        </div>
+                        <div class="small text-muted mb-2" th:if="${p.createurNomComplet != null and p.responsableNomComplet != null and p.createurId == p.responsableId}">
+                            <i class="bi bi-person-check text-success me-1"></i> Projet propre (créé et géré par <strong th:text="${p.responsableNomComplet}"></strong>)
+                        </div>
+                    </div>
+
+                    <div>
+                        <hr class="my-3 opacity-25">
+                        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                            <div class="d-flex align-items-center">
+                                <i class="bi bi-person-badge-fill text-primary fs-5 me-2"></i>
+                                <div>
+                                    <small class="text-muted d-block" style="font-size: 11px;">Responsable</small>
+                                    <span class="fw-semibold small" th:text="${p.responsableNomComplet}"></span>
+                                </div>
+                            </div>
+
+                            <div class="d-flex gap-2">
+                                <a th:href="@{/projets/{id}(id=${p.id})}" class="btn btn-outline-primary btn-sm">
+                                    Voir la Fiche <i class="bi bi-arrow-right ms-1"></i>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Message si aucun projet -->
+    <div th:if="${#lists.isEmpty(projets)}" class="text-center py-5">
+        <i class="bi bi-folder-x display-1 text-muted"></i>
+        <h4 class="text-muted mt-3">Aucun projet trouvé</h4>
+        <p class="text-muted">Essayez de modifier vos filtres ou créez un nouveau projet.</p>
+        <a th:href="@{/projets/nouveau}" sec:authorize="hasAuthority('ROLE_ADMIN')" class="btn btn-primary">
+            <i class="bi bi-plus-circle me-1"></i> Créer un projet
+        </a>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

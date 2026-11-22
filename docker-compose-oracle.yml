@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  oracle-db:
+    image: container-registry.oracle.com/database/free:latest
+    container_name: oracle_bilan_projets
+    restart: unless-stopped
+    environment:
+      - ORACLE_PWD=bilan_password
+      - ORACLE_CHARACTERSET=AL32UTF8
+    ports:
+      - "1521:1521"
+      - "5500:5500"  # Enterprise Manager Express
+    volumes:
+      - oracle_bilan_data:/opt/oracle/oradata
+    networks:
+      - bilan-net
+    healthcheck:
+      test: ["CMD-SHELL", "sqlplus -L bilan_user/bilan_password@//localhost:1521/FREEPDB1 @/dev/null || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 120s
+
+volumes:
+  oracle_bilan_data:
+
+networks:
+  bilan-net:
+    driver: bridge
+
+# ==============================================================================
+-- Pour utiliser ce docker-compose :
+-- 1. docker compose -f docker-compose-oracle.yml up -d
+-- 2. Attendre que le healthcheck passe (2-3 minutes au premier démarrage)
+-- 3. L'utilisateur 'bilan_user' avec mot de passe 'bilan_password' sera créé automatiquement
+--    par le script d'initialisation ci-dessous (à ajouter dans un volume init)
+-- 4. Lancer l'application avec le profil 'oracle' :
+--    mvn spring-boot:run -Dspring.profiles.active=oracle
+--
+-- Note : L'image Oracle Free est lourde (~8GB). Pour développement, préférez le profil 'dev' (H2).
+-- ==============================================================================

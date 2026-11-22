@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/thymeleaf-extras-springsecurity6">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Synthèse Bilan Annuel des Projets</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <style>
+        @media print {
+            .no-print { display: none !important; }
+            body { background: white !important; font-size: 12px; }
+            .card { box-shadow: none !important; border: 1px solid #ddd !important; }
+        }
+        .project-row:hover { background-color: #f8f9fa; }
+        .project-row.selected { background-color: #e7f3ff; }
+        .selection-badge { font-size: 0.85rem; }
+    </style>
+</head>
+<body class="bg-light">
+
+<div class="no-print" th:replace="~{layout/navbar :: navbar}"></div>
+
+<div class="container-fluid px-4 py-4">
+
+    <!-- En-tête avec sélection d'année -->
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 pb-2 border-bottom">
+        <div>
+            <h2 class="fw-bold mb-1">
+                <i class="bi bi-file-earmark-bar-graph text-primary me-2"></i>Bilan Annuel Consolidé des Projets (<span th:text="${anneeSelect}"></span>)
+            </h2>
+            <p class="text-muted mb-0">Rapport de gouvernance : situation, actions, fonctionnalités clés et état d'avancement par projet.</p>
+        </div>
+
+        <div class="d-flex gap-2 align-items-center no-print mt-2 mt-md-0">
+            <form th:action="@{/synthese}" method="get" class="d-flex align-items-center gap-2">
+                <select name="annee" class="form-select form-select-sm fw-bold shadow-sm" onchange="this.form.submit()">
+                    <option th:value="2027" th:selected="${anneeSelect == 2027}">Exercice 2027</option>
+                    <option th:value="2026" th:selected="${anneeSelect == 2026}">Exercice 2026</option>
+                    <option th:value="2025" th:selected="${anneeSelect == 2025}">Exercice 2025</option>
+                    <option th:value="2024" th:selected="${anneeSelect == 2024}">Exercice 2024</option>
+                </select>
+            </form>
+
+            <button onclick="window.print()" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-printer me-1"></i> Imprimer / Export PDF
+            </button>
+        </div>
+    </div>
+
+    <!-- Barre de sélection pour le rapport (Phase 4) -->
+    <div class="card border-0 shadow-sm mb-4 no-print">
+        <div class="card-header bg-white py-3">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+                <h5 class="fw-bold mb-0">
+                    <i class="bi bi-check2-square text-primary me-2"></i>Sélection des projets pour le rapport annuel
+                </h5>
+                <div class="d-flex gap-2 flex-wrap">
+                    <span class="badge bg-primary selection-badge align-self-center">
+                        <span id="selectedCount">0</span> / <span th:text="${synthese.totalProjets}">0</span> projet(s) sélectionné(s)
+                    </span>
+                    <button type="button" class="btn btn-outline-primary btn-sm" onclick="selectAllProjects(true)">
+                        <i class="bi bi-check-all me-1"></i> Tout cocher
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" onclick="selectAllProjects(false)">
+                        <i class="bi bi-x-square me-1"></i> Tout décocher
+                    </button>
+                    <button type="button" class="btn btn-info btn-sm" id="previewBtn" onclick="openPreviewModal()" disabled>
+                        <i class="bi bi-eye me-1"></i> Aperçu du rapport
+                    </button>
+                    <button type="button" class="btn btn-success btn-sm" id="exportWordBtn" onclick="exportWordReport()" disabled>
+                        <i class="bi bi-file-earmark-word me-1"></i> Générer Word (.docx)
+                    </button>
+                </div>
+            </div>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0 align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th style="width: 50px;">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="selectAllHeader" onchange="toggleAllCheckboxes(this)">
+                                    <label class="form-check-label visually-hidden" for="selectAllHeader">Tout sélectionner</label>
+                                </div>
+                            </th>
+                            <th>Projet</th>
+                            <th style="width: 180px;">Situation</th>
+                            <th style="width: 150px;">Avancement</th>
+                            <th style="width: 150px;">Fonctionnalités</th>
+                            <th style="width: 180px;">Dernière M.A.J</th>
+                        </tr>
+                    </thead>
+                    <tbody id="projectsTableBody">
+                        <tr class="project-row" th:each="fiche : ${synthese.fichesProjets}" th:data-projet-id="${fiche.projetId}">
+                            <td>
+                                <div class="form-check">
+                                    <input type="checkbox" class="form-check-input project-checkbox" 
+                                           th:value="${fiche.projetId}" 
+                                           th:checked="${fiche.inclusRapportAnnuel != false}"
+                                           onchange="updateSelection()">
+                                </div>
+                            </td>
+                            <td>
+                                <div class="d-flex align-items-center gap-2">
+                                    <strong th:text="${fiche.intitule}"></strong>
+                                    <span class="badge bg-secondary font-monospace" th:text="${fiche.codeProjet}"></span>
+                                    <span th:if="${fiche.typeProjet?.name() == 'NOUVEAU'}" class="badge bg-success">Nouveau</span>
+                                    <span th:if="${fiche.typeProjet?.name() == 'PLURIANNUEL'}" class="badge bg-primary">Pluriannuel</span>
+                                    <span th:if="${fiche.typeProjet?.name() == 'ANCIEN'}" class="badge bg-secondary">Ancien</span>
+                                </div>
+                                <small class="text-muted d-block" th:text="${fiche.responsableNomComplet}"></small>
+                            </td>
+                            <td>
+                                <span th:if="${fiche.situationProjet?.name() == 'EN_BONNE_VOIE'}" class="badge bg-success fs-6 px-3 py-2">En bonne voie</span>
+                                <span th:if="${fiche.situationProjet?.name() == 'SOUS_VIGILANCE'}" class="badge bg-warning text-dark fs-6 px-3 py-2">Sous vigilance</span>
+                                <span th:if="${fiche.situationProjet?.name() == 'CRITIQUE'}" class="badge bg-danger fs-6 px-3 py-2">Critique</span>
+                                <span th:if="${fiche.situationProjet?.name() == 'TERMINE'}" class="badge bg-info text-dark fs-6 px-3 py-2">Terminé</span>
+                                <span th:if="${fiche.situationProjet?.name() == 'SUSPENDU'}" class="badge bg-secondary fs-6 px-3 py-2">Suspendu</span>
+                            </td>
+                            <td>
+                                <div class="d-flex align-items-center gap-2">
+                                    <div class="progress flex-grow-1" style="height: 8px;">
+                                        <div class="progress-bar bg-success" role="progressbar" 
+                                             th:style="'width: ' + ${fiche.pourcentageAvancement} + '%'" 
+                                             th:aria-valuenow="${fiche.pourcentageAvancement}"></div>
+                                    </div>
+                                    <span class="fw-bold text-success small" th:text="${fiche.pourcentageAvancement} + '%'"></span>
+                                </div>
+                            </td>
+                            <td>
+                                <small class="text-muted" th:text="${fiche.totalFonctionnalites} + ' au total, ' + ${fiche.fonctionnalitesTerminees} + ' terminées'"></small>
+                            </td>
+                            <td>
+                                <small class="text-muted" th:text="${#temporals.format(fiche.dateDerniereMiseAJour, 'dd/MM/yyyy HH:mm')}"></small>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Fiches détaillées par projet (Affichage complet pour impression/consultation) -->
+    <div class="card border-0 shadow-sm rounded-3 bg-white mb-4" th:each="fiche : ${synthese.fichesProjets}">
+        <div class="card-header bg-white py-3 border-bottom d-flex flex-wrap justify-content-between align-items-center">
+            <div class="d-flex align-items-center gap-2">
+                <h5 class="fw-bold mb-0" th:text="${fiche.intitule}"></h5>
+                <span class="badge bg-secondary font-monospace" th:text="${fiche.codeProjet}"></span>
+                
+                <span th:if="${fiche.typeProjet?.name() == 'NOUVEAU'}" class="badge bg-success">Nouveau</span>
+                <span th:if="${fiche.typeProjet?.name() == 'PLURIANNUEL'}" class="badge bg-primary">Pluriannuel</span>
+                <span th:if="${fiche.typeProjet?.name() == 'ANCIEN'}" class="badge bg-secondary">Ancien</span>
+            </div>
+
+            <div class="d-flex align-items-center gap-3">
+                <span class="text-muted small">
+                    Responsable : <strong th:text="${fiche.responsableNomComplet}"></strong>
+                </span>
+
+                <span th:if="${fiche.situationProjet?.name() == 'EN_BONNE_VOIE'}" class="badge bg-success">En bonne voie</span>
+                <span th:if="${fiche.situationProjet?.name() == 'SOUS_VIGILANCE'}" class="badge bg-warning text-dark">Sous vigilance</span>
+                <span th:if="${fiche.situationProjet?.name() == 'CRITIQUE'}" class="badge bg-danger">Critique</span>
+                <span th:if="${fiche.situationProjet?.name() == 'TERMINE'}" class="badge bg-info text-dark">Terminé</span>
+                <span th:if="${fiche.situationProjet?.name() == 'SUSPENDU'}" class="badge bg-secondary">Suspendu</span>
+            </div>
+        </div>
+
+        <div class="card-body p-4">
+            <div class="row g-3 mb-3">
+                <div class="col-md-7">
+                    <h6 class="fw-bold text-muted small text-uppercase">Description du projet :</h6>
+                    <p class="text-secondary small mb-3" th:text="${fiche.description}"></p>
+
+                    <h6 class="fw-bold text-muted small text-uppercase">Actions menées durant l'année en cours :</h6>
+                    <div class="p-2 bg-light rounded small mb-3" th:text="${fiche.actionsAnneeEnCours} ?: 'Aucune action renseignée.'"></div>
+
+                    <h6 class="fw-bold text-muted small text-uppercase">Fonctionnalités principales :</h6>
+                    <p class="text-dark fw-semibold small mb-0" th:text="${fiche.fonctionnalitesPrincipales} ?: 'Non renseigné.'"></p>
+                </div>
+
+                <div class="col-md-5">
+                    <h6 class="fw-bold text-muted small text-uppercase">
+                        Liste des Fonctionnalités & Statuts (<span th:text="${fiche.listeFonctionnalites.size()}"></span>) :
+                    </h6>
+                    <ul class="list-group list-group-flush border rounded small" style="max-height: 220px; overflow-y: auto;">
+                        <li class="list-group-item d-flex justify-content-between align-items-center py-2" th:each="f : ${fiche.listeFonctionnalites}">
+                            <div>
+                                <span class="fw-semibold" th:text="${f.intitule}"></span>
+                                <i th:if="${f.estPrincipale}" class="bi bi-star-fill text-warning ms-1" title="Principale"></i>
+                            </div>
+                            <span class="badge"
+                                  th:classappend="${f.statut?.name() == 'TERMINE'} ? 'bg-success' : (${f.statut?.name() == 'BLOQUE'} ? 'bg-danger' : (${f.statut?.name() == 'EN_COURS' or f.statut?.name() == 'EN_RECETTE'} ? 'bg-primary' : 'bg-secondary'))"
+                                  th:text="${f.statutLibelle}">
+                            </span>
+                        </li>
+                    </ul>
+
+                    <div class="d-flex justify-content-between align-items-center mt-3">
+                        <small class="text-muted">Taux d'achèvement :</small>
+                        <strong class="text-success" th:text="${fiche.pourcentageAvancement} + '%'"></strong>
+                    </div>
+                    <div class="progress" style="height: 6px;">
+                        <div class="progress-bar bg-success" role="progressbar" th:style="'width: ' + ${fiche.pourcentageAvancement} + '%;'"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modale d'aperçu avant export Word -->
+<div class="modal fade no-print" id="previewModal" tabindex="-1" aria-labelledby="previewModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-fullscreen-md-down">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="previewModalLabel">
+                    <i class="bi bi-eye me-2"></i>Aperçu du Rapport Bilan Annuel <span th:text="${anneeSelect}"></span>
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-0" style="max-height: 80vh; overflow-y: auto;">
+                <div id="previewContent" class="p-4 bg-white">
+                    <!-- Contenu injecté dynamiquement -->
+                </div>
+            </div>
+            <div class="modal-footer border-top">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                    <i class="bi bi-x me-1"></i> Fermer
+                </button>
+                <button type="button" class="btn btn-success" onclick="confirmExportWord()">
+                    <i class="bi bi-file-earmark-word me-1"></i> Confirmer & Télécharger le Word (.docx)
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    // Variables globales
+    let selectedProjectIds = [];
+    let previewProjectIds = [];
+
+    // Initialisation au chargement
+    document.addEventListener('DOMContentLoaded', function() {
+        updateSelection();
+        updateHeaderCheckbox();
+    });
+
+    // Met à jour la sélection et l'état des boutons
+    function updateSelection() {
+        const checkboxes = document.querySelectorAll('.project-checkbox:checked');
+        selectedProjectIds = Array.from(checkboxes).map(cb => parseInt(cb.value));
+        
+        const count = selectedProjectIds.length;
+        const total = document.querySelectorAll('.project-checkbox').length;
+        
+        document.getElementById('selectedCount').textContent = count;
+        
+        const previewBtn = document.getElementById('previewBtn');
+        const exportBtn = document.getElementById('exportWordBtn');
+        
+        if (count > 0) {
+            previewBtn.disabled = false;
+            exportBtn.disabled = false;
+        } else {
+            previewBtn.disabled = true;
+            exportBtn.disabled = true;
+        }
+        
+        // Mise à jour visuelle des lignes
+        document.querySelectorAll('.project-row').forEach(row => {
+            const cb = row.querySelector('.project-checkbox');
+            if (cb.checked) {
+                row.classList.add('selected');
+            } else {
+                row.classList.remove('selected');
+            }
+        });
+        
+        updateHeaderCheckbox();
+    }
+
+    // Coche/décoche tous les projets
+    function selectAllProjects(select) {
+        document.querySelectorAll('.project-checkbox').forEach(cb => {
+            cb.checked = select;
+        });
+        updateSelection();
+    }
+
+    // Gère la checkbox "Tout sélectionner" dans l'en-tête
+    function toggleAllCheckboxes(headerCheckbox) {
+        document.querySelectorAll('.project-checkbox').forEach(cb => {
+            cb.checked = headerCheckbox.checked;
+        });
+        updateSelection();
+    }
+
+    // Met à jour l'état de la checkbox d'en-tête
+    function updateHeaderCheckbox() {
+        const headerCb = document.getElementById('selectAllHeader');
+        const allCheckboxes = document.querySelectorAll('.project-checkbox');
+        const checkedCheckboxes = document.querySelectorAll('.project-checkbox:checked');
+        
+        if (checkedCheckboxes.length === 0) {
+            headerCb.checked = false;
+            headerCb.indeterminate = false;
+        } else if (checkedCheckboxes.length === allCheckboxes.length) {
+            headerCb.checked = true;
+            headerCb.indeterminate = false;
+        } else {
+            headerCb.checked = false;
+            headerCb.indeterminate = true;
+        }
+    }
+
+    // Ouvre la modale d'aperçu
+    function openPreviewModal() {
+        previewProjectIds = [...selectedProjectIds];
+        
+        if (previewProjectIds.length === 0) {
+            alert('Veuillez sélectionner au moins un projet.');
+            return;
+        }
+        
+        // Affiche la modale
+        const modal = new bootstrap.Modal(document.getElementById('previewModal'));
+        modal.show();
+        
+        // Charge le contenu de l'aperçu via AJAX
+        loadPreviewContent();
+    }
+
+    // Charge le contenu HTML de l'aperçu
+    function loadPreviewContent() {
+        const container = document.getElementById('previewContent');
+        container.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Chargement...</span></div><p class="mt-2 text-muted">Génération de l\'aperçu...</p></div>';
+        
+        fetch('/api/synthese/annee/' + ${anneeSelect} + '/preview', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: JSON.stringify({ projetIds: previewProjectIds })
+        })
+        .then(response => {
+            if (!response.ok) throw new Error('Erreur lors du chargement de l\'aperçu');
+            return response.text();
+        })
+        .then(html => {
+            container.innerHTML = html;
+        })
+        .catch(error => {
+            console.error(error);
+            container.innerHTML = '<div class="alert alert-danger m-3">Erreur lors du chargement de l\'aperçu : ' + error.message + '</div>';
+        });
+    }
+
+    // Confirme et lance le téléchargement Word
+    function confirmExportWord() {
+        if (previewProjectIds.length === 0) {
+            alert('Aucun projet sélectionné.');
+            return;
+        }
+        
+        // Ferme la modale
+        const modal = bootstrap.Modal.getInstance(document.getElementById('previewModal'));
+        modal.hide();
+        
+        // Lance le téléchargement
+        exportWordReport(previewProjectIds);
+    }
+
+    // Exporte le rapport Word
+    function exportWordReport(projectIds = null) {
+        const ids = projectIds || selectedProjectIds;
+        
+        if (ids.length === 0) {
+            alert('Veuillez sélectionner au moins un projet.');
+            return;
+        }
+        
+        // Crée un formulaire invisible pour le POST et téléchargement
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = '/api/synthese/annee/' + ${anneeSelect} + '/export-word';
+        form.style.display = 'none';
+        
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'projetIds';
+        input.value = JSON.stringify(ids);
+        form.appendChild(input);
+        
+        document.body.appendChild(form);
+        form.submit();
+        document.body.removeChild(form);
+    }
+</script>
+</body>
+</html>

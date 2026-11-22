@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  mysql-db:
+    image: mysql:8.0
+    container_name: mysql_bilan_projets
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: root_password
+      MYSQL_DATABASE: bilan_projets_db
+      MYSQL_USER: user_bilan
+      MYSQL_PASSWORD: user_password
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_bilan_data:/var/lib/mysql
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    networks:
+      - bilan-net
+
+volumes:
+  mysql_bilan_data:
+
+networks:
+  bilan-net:
+    driver: bridge
